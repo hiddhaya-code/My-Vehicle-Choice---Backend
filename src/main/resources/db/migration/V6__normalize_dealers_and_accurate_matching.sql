@@ -24,13 +24,13 @@ UPDATE brands SET official_dealer_locator_url = 'https://www.bmw.in/en/fastlane/
 
 -- 2. Enhance dealers table with capabilities, geocoordinates and verification metadata
 ALTER TABLE dealers
-ADD COLUMN dealer_type VARCHAR(30) NOT NULL DEFAULT 'SALES' AFTER is_authorized,
-ADD COLUMN locality VARCHAR(150) NULL AFTER address,
-ADD COLUMN latitude DECIMAL(10, 7) NULL AFTER pincode,
-ADD COLUMN longitude DECIMAL(10, 7) NULL AFTER latitude,
-ADD COLUMN official_locator_url VARCHAR(300) NULL AFTER website,
-ADD COLUMN verification_status VARCHAR(50) NOT NULL DEFAULT 'OFFICIAL_OEM_VERIFIED' AFTER is_authorized,
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at;
+ADD COLUMN dealer_type VARCHAR(30) NOT NULL DEFAULT 'SALES',
+ADD COLUMN locality VARCHAR(150) NULL,
+ADD COLUMN latitude DECIMAL(10, 7) NULL,
+ADD COLUMN longitude DECIMAL(10, 7) NULL,
+ADD COLUMN official_locator_url VARCHAR(300) NULL,
+ADD COLUMN verification_status VARCHAR(50) NOT NULL DEFAULT 'OFFICIAL_OEM_VERIFIED',
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
 -- 3. Normalized Dealer-Brand Authorization Table
 CREATE TABLE IF NOT EXISTS dealer_brands (
