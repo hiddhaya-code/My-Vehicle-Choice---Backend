@@ -13,6 +13,7 @@ public class DealerEnquiryResponse {
     private String customerPhone;
     private String city;
     private String enquiryType;
+    private java.time.LocalDate preferredDate;
     private String message;
     private String status;
     private LocalDateTime createdAt;
@@ -48,6 +49,9 @@ public class DealerEnquiryResponse {
 
     public String getEnquiryType() { return enquiryType; }
     public void setEnquiryType(String enquiryType) { this.enquiryType = enquiryType; }
+
+    public java.time.LocalDate getPreferredDate() { return preferredDate; }
+    public void setPreferredDate(java.time.LocalDate preferredDate) { this.preferredDate = preferredDate; }
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }

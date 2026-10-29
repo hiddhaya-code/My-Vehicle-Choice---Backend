@@ -2,10 +2,17 @@ package com.myvehiclechoice.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 
 public class DealerEnquiryRequest {
+
+    @NotNull(message = "Dealer ID is required")
     private Long dealerId;
+
+    @NotNull(message = "Vehicle ID is required")
     private Long vehicleId;
+
     private Long variantId;
 
     @NotBlank(message = "Customer name is required")
@@ -23,6 +30,8 @@ public class DealerEnquiryRequest {
 
     @NotBlank(message = "Enquiry type is required")
     private String enquiryType = "TEST_DRIVE"; // TEST_DRIVE, PRICE_QUOTE, AVAILABILITY, CONTACT_REQUEST
+
+    private LocalDate preferredDate;
 
     private String message;
 
@@ -51,6 +60,9 @@ public class DealerEnquiryRequest {
 
     public String getEnquiryType() { return enquiryType; }
     public void setEnquiryType(String enquiryType) { this.enquiryType = enquiryType; }
+
+    public LocalDate getPreferredDate() { return preferredDate; }
+    public void setPreferredDate(LocalDate preferredDate) { this.preferredDate = preferredDate; }
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }

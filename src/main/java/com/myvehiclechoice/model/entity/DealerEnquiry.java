@@ -42,6 +42,9 @@ public class DealerEnquiry {
     @Column(name = "enquiry_type", nullable = false, length = 50)
     private String enquiryType; // TEST_DRIVE, PRICE_QUOTE, AVAILABILITY, CONTACT_REQUEST
 
+    @Column(name = "preferred_date")
+    private java.time.LocalDate preferredDate;
+
     @Column(columnDefinition = "TEXT")
     private String message;
 
@@ -97,6 +100,9 @@ public class DealerEnquiry {
 
     public String getEnquiryType() { return enquiryType; }
     public void setEnquiryType(String enquiryType) { this.enquiryType = enquiryType; }
+
+    public java.time.LocalDate getPreferredDate() { return preferredDate; }
+    public void setPreferredDate(java.time.LocalDate preferredDate) { this.preferredDate = preferredDate; }
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }

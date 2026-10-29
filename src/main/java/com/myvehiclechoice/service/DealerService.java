@@ -253,19 +253,66 @@ public class DealerService {
     }
 
     public DealerEnquiryResponse createEnquiry(DealerEnquiryRequest req, String userEmail) {
+        if (req.getVehicleId() == null) {
+            throw new IllegalArgumentException("A valid vehicle ID is required to submit a dealer enquiry.");
+        }
+        if (req.getDealerId() == null) {
+            throw new IllegalArgumentException("A valid dealer ID is required to submit a dealer enquiry.");
+        }
+
+        Vehicle vehicle = vehicleRepository.findById(req.getVehicleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found with ID: " + req.getVehicleId()));
+
+        Dealer dealer = dealerRepository.findById(req.getDealerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Dealer not found with ID: " + req.getDealerId()));
+
+        // Enforce Dealer Capability: Service-only workshops cannot accept vehicle purchase / test-drive enquiries
+        if ("SERVICE".equalsIgnoreCase(dealer.getDealerType())) {
+            throw new IllegalArgumentException(
+                    "Selected location '" + dealer.getName() + "' is an authorized service workshop only, not a vehicle sales showroom."
+            );
+        }
+
+        // Enforce Strict Manufacturer & Category Authorization Match: No cross-brand leakage
+        List<DealerBrand> authorizedBrands = dealerBrandRepository.findByDealerId(dealer.getId());
+        boolean isBrandAuthorized = authorizedBrands.stream().anyMatch(db ->
+                db.getBrand().getId().equals(vehicle.getBrand().getId()) &&
+                Boolean.TRUE.equals(db.getIsAuthorized()) &&
+                (db.getVehicleCategory() == null || db.getVehicleCategory().equals(vehicle.getCategory()))
+        );
+
+        // Fallback check against dealer.getBrandName() if relational dealer_brands was not mapped
+        if (!isBrandAuthorized && authorizedBrands.isEmpty()) {
+            isBrandAuthorized = dealer.getBrandName() != null &&
+                    dealer.getBrandName().equalsIgnoreCase(vehicle.getBrand().getName());
+        }
+
+        if (!isBrandAuthorized) {
+            throw new IllegalArgumentException(
+                    "Selected dealer '" + dealer.getName() + "' is not an authorized sales partner for " +
+                    vehicle.getBrand().getName() + " (" + vehicle.getCategory() + ")."
+            );
+        }
+
+        // Validate Preferred Date (Must not be in the past)
+        if (req.getPreferredDate() != null) {
+            if (req.getPreferredDate().isBefore(java.time.LocalDate.now())) {
+                throw new IllegalArgumentException("Preferred test-drive date cannot be in the past.");
+            }
+        }
+
         DealerEnquiry enquiry = new DealerEnquiry();
+        enquiry.setDealer(dealer);
+        enquiry.setVehicle(vehicle);
+
+        if (req.getVariantId() != null) {
+            variantRepository.findById(req.getVariantId()).ifPresent(enquiry::setVariant);
+        } else if (vehicle.getVariants() != null && !vehicle.getVariants().isEmpty()) {
+            enquiry.setVariant(vehicle.getVariants().get(0));
+        }
 
         if (userEmail != null) {
             userRepository.findByEmailIgnoreCase(userEmail).ifPresent(enquiry::setUser);
-        }
-        if (req.getDealerId() != null) {
-            dealerRepository.findById(req.getDealerId()).ifPresent(enquiry::setDealer);
-        }
-        if (req.getVehicleId() != null) {
-            vehicleRepository.findById(req.getVehicleId()).ifPresent(enquiry::setVehicle);
-        }
-        if (req.getVariantId() != null) {
-            variantRepository.findById(req.getVariantId()).ifPresent(enquiry::setVariant);
         }
 
         enquiry.setCustomerName(req.getCustomerName());
@@ -273,6 +320,7 @@ public class DealerService {
         enquiry.setCustomerPhone(req.getCustomerPhone());
         enquiry.setCity(req.getCity());
         enquiry.setEnquiryType(req.getEnquiryType());
+        enquiry.setPreferredDate(req.getPreferredDate());
         enquiry.setMessage(req.getMessage());
         enquiry.setStatus("NEW");
 
@@ -324,6 +372,7 @@ public class DealerService {
         dto.setCustomerPhone(e.getCustomerPhone());
         dto.setCity(e.getCity());
         dto.setEnquiryType(e.getEnquiryType());
+        dto.setPreferredDate(e.getPreferredDate());
         dto.setMessage(e.getMessage());
         dto.setStatus(e.getStatus());
         dto.setCreatedAt(e.getCreatedAt());

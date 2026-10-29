@@ -1,5 +1,7 @@
 package com.myvehiclechoice;
 
+import com.myvehiclechoice.dto.DealerEnquiryRequest;
+import com.myvehiclechoice.dto.DealerEnquiryResponse;
 import com.myvehiclechoice.dto.DealerResponseDto;
 import com.myvehiclechoice.model.entity.*;
 import com.myvehiclechoice.model.enums.VehicleCategory;
@@ -449,5 +451,116 @@ class DealerServiceTest {
         assertNotNull(result.get(0).getDistanceKm());
         assertTrue(result.get(0).getDistanceKm() < 20.0, "Delhi dealer distance should be under 20km");
         assertTrue(result.get(1).getDistanceKm() > 1500.0, "Bengaluru dealer distance should be over 1500km");
+    }
+
+    @Test
+    @DisplayName("Enquiry: Submission fails when vehicleId is missing")
+    void createEnquiry_FailsWhenVehicleIdMissing() {
+        DealerEnquiryRequest req = new DealerEnquiryRequest();
+        req.setDealerId(1L);
+        req.setCustomerName("Rahul");
+        req.setCustomerEmail("rahul@example.com");
+        req.setCustomerPhone("9876543210");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                dealerService.createEnquiry(req, "rahul@example.com")
+        );
+        assertTrue(ex.getMessage().contains("vehicle ID is required"));
+    }
+
+    @Test
+    @DisplayName("Enquiry: Submission fails when dealer is service-only workshop")
+    void createEnquiry_FailsForServiceOnlyDealer() {
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(tataNexon));
+        when(dealerRepository.findById(16L)).thenReturn(Optional.of(tataServiceOnlyDealer));
+
+        DealerEnquiryRequest req = new DealerEnquiryRequest();
+        req.setDealerId(16L);
+        req.setVehicleId(1L);
+        req.setCustomerName("Rahul");
+        req.setCustomerEmail("rahul@example.com");
+        req.setCustomerPhone("9876543210");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                dealerService.createEnquiry(req, "rahul@example.com")
+        );
+        assertTrue(ex.getMessage().contains("service workshop only"));
+    }
+
+    @Test
+    @DisplayName("Enquiry: Cross-brand dealer leakage is strictly rejected")
+    void createEnquiry_RejectsCrossBrandDealerLeakage() {
+        // Attempting to enquire about Tata Nexon with Hyundai dealer
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(tataNexon));
+        when(dealerRepository.findById(2L)).thenReturn(Optional.of(hyundaiDealer));
+        when(dealerBrandRepository.findByDealerId(2L)).thenReturn(List.of(
+                new DealerBrand(hyundaiDealer, hyundaiBrand, VehicleCategory.CAR, true, "Hyundai Passenger")
+        ));
+
+        DealerEnquiryRequest req = new DealerEnquiryRequest();
+        req.setDealerId(2L);
+        req.setVehicleId(1L); // Tata Nexon with Hyundai dealer
+        req.setCustomerName("Rahul");
+        req.setCustomerEmail("rahul@example.com");
+        req.setCustomerPhone("9876543210");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                dealerService.createEnquiry(req, "rahul@example.com")
+        );
+        assertTrue(ex.getMessage().contains("not an authorized sales partner for Tata Motors"));
+    }
+
+    @Test
+    @DisplayName("Enquiry: Past test-drive dates are rejected by server-side validation")
+    void createEnquiry_RejectsPastTestDriveDate() {
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(tataNexon));
+        when(dealerRepository.findById(1L)).thenReturn(Optional.of(tataSalesDealer));
+        when(dealerBrandRepository.findByDealerId(1L)).thenReturn(List.of(
+                new DealerBrand(tataSalesDealer, tataBrand, VehicleCategory.CAR, true, "Tata Motors Division")
+        ));
+
+        DealerEnquiryRequest req = new DealerEnquiryRequest();
+        req.setDealerId(1L);
+        req.setVehicleId(1L);
+        req.setCustomerName("Rahul");
+        req.setCustomerEmail("rahul@example.com");
+        req.setCustomerPhone("9876543210");
+        req.setPreferredDate(LocalDate.now().minusDays(1)); // Past date
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                dealerService.createEnquiry(req, "rahul@example.com")
+        );
+        assertTrue(ex.getMessage().contains("cannot be in the past"));
+    }
+
+    @Test
+    @DisplayName("Enquiry: Valid enquiry with authorized dealer and future date succeeds")
+    void createEnquiry_SucceedsWithAuthorizedDealerAndFutureDate() {
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(tataNexon));
+        when(dealerRepository.findById(1L)).thenReturn(Optional.of(tataSalesDealer));
+        when(dealerBrandRepository.findByDealerId(1L)).thenReturn(List.of(
+                new DealerBrand(tataSalesDealer, tataBrand, VehicleCategory.CAR, true, "Tata Motors Division")
+        ));
+        when(enquiryRepository.save(any(DealerEnquiry.class))).thenAnswer(invocation -> {
+            DealerEnquiry saved = invocation.getArgument(0);
+            saved.setId(101L);
+            return saved;
+        });
+
+        DealerEnquiryRequest req = new DealerEnquiryRequest();
+        req.setDealerId(1L);
+        req.setVehicleId(1L);
+        req.setCustomerName("Rahul Sharma");
+        req.setCustomerEmail("rahul@example.com");
+        req.setCustomerPhone("9876543210");
+        req.setPreferredDate(LocalDate.now().plusDays(2)); // Future date
+        req.setEnquiryType("TEST_DRIVE");
+
+        DealerEnquiryResponse resp = dealerService.createEnquiry(req, "rahul@example.com");
+        assertNotNull(resp);
+        assertEquals(101L, resp.getId());
+        assertEquals("SAB Motors Tata Authorized Dealership [TEST]", resp.getDealerName());
+        assertEquals("Tata Motors Nexon", resp.getVehicleName());
+        assertEquals(LocalDate.now().plusDays(2), resp.getPreferredDate());
     }
 }
